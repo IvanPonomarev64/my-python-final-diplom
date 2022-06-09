@@ -1,6 +1,7 @@
 from django.urls import path
 from django_rest_passwordreset.views import reset_password_request_token, reset_password_confirm
 
+from orders.api.views.order_views import BasketView, OrderView
 from orders.api.views.partner_views import PartnerUpdate, PartnerState, PartnerOrders
 from orders.api.views.product_views import CategoryView, ShopView, ProductInfoView
 from orders.api.views.user_views import RegisterAccount, ConfirmAccount, LoginAccount, AccountDetails, ContactView
@@ -21,6 +22,6 @@ urlpatterns = [
     path('categories/', CategoryView.as_view(), name='categories'),
     path('shops/', ShopView.as_view(), name='shops'),
     path('products/', ProductInfoView.as_view(), name='shops'),
-
-
+    path('basket/', BasketView.as_view(), name='basket'),
+    path('order', OrderView.as_view(), name='order'),
 ]
