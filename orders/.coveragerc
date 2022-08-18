@@ -1,0 +1,2 @@
+[run]
+omit=tests/*, venv/*, orders/*, *tests.py, api/migrations/*, manage.py, api/views/__init__.py, api/__init__.py
