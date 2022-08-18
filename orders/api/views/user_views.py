@@ -10,6 +10,12 @@ from rest_framework.views import APIView
 from api.models import User, ConfirmEmailToken, Contact
 from api.serializers import UserSerializer, ContactSerializer
 
+from django.views.generic import TemplateView
+
+
+class Home(TemplateView):
+    template_name = "home.html"
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -56,6 +62,7 @@ class LoginAccount(APIView):
     """
     Класс для авторизации пользователей
     """
+
     def post(self, request, *args, **kwargs):
         if {'email', 'password'}.issubset(request.data):
             user = User.objects.filter(email=request.data['email'], password=request.data['password']).first()
