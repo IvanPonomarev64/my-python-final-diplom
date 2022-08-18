@@ -14,12 +14,15 @@ from api.permissions import IsShop
 from api.serializers import OrderSerializer, ShopSerializer
 from api.views.supporotive.supportive_for_partner import uploading_data_to_db
 
+from rest_framework.throttling import UserRateThrottle
+
 
 class PartnerUpdate(CreateAPIView):
     """
     Класс для обновления прайса от поставщика
     """
     permission_classes = (IsAuthenticated, IsShop)
+    throttle_scope = 'update_price'
 
     def post(self, request, *args, **kwargs):
         query = request.data
@@ -59,7 +62,7 @@ class PartnerOrders(RetrieveAPIView):
     """
     Класс для получения заказов поставщиками
     """
-    permission_classes = (IsAuthenticated, IsShop,)
+    permission_classes = (IsAuthenticated, IsShop, UserRateThrottle,)
     serializer_class = OrderSerializer
 
     def get(self, request, *args, **kwargs):

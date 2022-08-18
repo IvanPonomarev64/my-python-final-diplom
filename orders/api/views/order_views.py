@@ -11,6 +11,8 @@ from api.serializers import OrderSerializer
 from ujson import loads as load_json
 from api.tasks import new_order_email
 
+from rest_framework.throttling import UserRateThrottle
+
 
 class BasketView(RetrieveUpdateDestroyAPIView):
     """
@@ -18,6 +20,7 @@ class BasketView(RetrieveUpdateDestroyAPIView):
     """
     permission_classes = (IsAuthenticated,)
     serializer_class = OrderSerializer
+    throttle_scope = 'basket'
 
     def get(self, request, *args, **kwargs):
         """
@@ -105,7 +108,7 @@ class OrderView(RetrieveUpdateAPIView):
     """
     Класс для получения и размещения заказов пользователями
     """
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, UserRateThrottle)
     serializer_class = OrderSerializer
 
     def get(self, request, *args, **kwargs):
