@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '^w+ks!^$)wavw!b8yf&_saa9&@$f=wl54ve)spadjz55_f)w=v'
+SECRET_KEY = 'n!qrhp47(_cm!zwjq*opo0z#p+gj@evm#+x7!-f!t-hdx@34d#'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,10 +37,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'api',
+    'api.apps.ApiConfig',
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
+    'djoser',
     'django_rest_passwordreset',
+
 ]
 
 MIDDLEWARE = [
@@ -58,7 +61,7 @@ ROOT_URLCONF = 'orders.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -127,7 +130,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 AUTH_USER_MODEL = 'api.User'
 
-
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 40,
@@ -135,14 +137,20 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
-
     ),
-
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        # 'rest_framework.authentication.SessionAuthentication',
-        # 'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ),
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Orders API',
+    'DESCRIPTION': 'Api for product orders',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 BROKER_URL = 'redis://localhost:6379'
@@ -150,4 +158,3 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-

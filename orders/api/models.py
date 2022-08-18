@@ -1,10 +1,9 @@
-from django.db import models as m
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_rest_passwordreset.tokens import get_token_generator
-
 
 STATE_CHOICES = (
     ('basket', 'Статус корзины'),
@@ -62,14 +61,15 @@ class User(AbstractUser):
     """
     Стандартная модель пользователей
     """
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['username']
     objects = UserManager()
     USERNAME_FIELD = 'email'
-    email = m.EmailField(_('email address'), unique=True)
-    company = m.CharField(verbose_name='Компания', max_length=40, blank=True)
-    position = m.CharField(verbose_name='Должность', max_length=40, blank=True)
+    email = models.EmailField(_('email address'), unique=True)
+    company = models.CharField(verbose_name='Компания', max_length=40, blank=True)
+    position = models.CharField(verbose_name='Должность', max_length=40, blank=True)
+    password_2 = models.CharField(_('password_2'), max_length=128)
     username_validator = UnicodeUsernameValidator()
-    username = m.CharField(
+    username = models.CharField(
         _('username'),
         max_length=150,
         help_text=_('Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.'),
@@ -78,15 +78,15 @@ class User(AbstractUser):
             'unique': _("A user with that username already exists."),
         },
     )
-    is_active = m.BooleanField(
+    is_active = models.BooleanField(
         _('active'),
-        default=False,
+        default=True,
         help_text=_(
             'Designates whether this user should be treated as active. '
             'Unselect this instead of deleting accounts.'
         ),
     )
-    type = m.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer')
+    type = models.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer')
 
     def __str__(self):
         return f'{self.first_name} {self.last_name}'
@@ -96,11 +96,41 @@ class User(AbstractUser):
         verbose_name_plural = "Список пользователей"
         ordering = ('email',)
 
+    @classmethod
+    def password_comparison(cls, pass_1, pass_2):
+        return pass_1 == pass_2
 
-class Shop(m.Model):
-    name = m.CharField(max_length=80, verbose_name='Название')
-    url = m.URLField(verbose_name='Ссылка', null=True, blank=True)
-    user = m.OneToOneField('User', verbose_name='Пользователь', blank=True, null=True, on_delete=m.CASCADE)
+
+class Contact(models.Model):
+    user = models.ForeignKey(User, verbose_name='Пользователь',
+                             related_name='contacts', blank=True,
+                             on_delete=models.CASCADE)
+
+    city = models.CharField(max_length=50, verbose_name='Город')
+    street = models.CharField(max_length=100, verbose_name='Улица')
+    house = models.CharField(max_length=15, verbose_name='Дом', blank=True)
+    structure = models.CharField(max_length=15, verbose_name='Корпус', blank=True)
+    building = models.CharField(max_length=15, verbose_name='Строение', blank=True)
+    apartment = models.CharField(max_length=15, verbose_name='Квартира', blank=True)
+    phone = models.CharField(max_length=20, verbose_name='Телефон')
+
+    class Meta:
+        verbose_name = 'Контакты пользователя'
+        verbose_name_plural = "Список контактов пользователя"
+
+    def __str__(self):
+        return f'{self.city} {self.street} {self.phone}'
+
+
+class Shop(models.Model):
+    name = models.CharField(max_length=50, verbose_name='Название')
+    url = models.URLField(verbose_name='Ссылка', null=True, blank=True)
+    user = models.OneToOneField(User, verbose_name='Пользователь',
+                                blank=True, null=True,
+                                on_delete=models.CASCADE)
+    state = models.BooleanField(verbose_name='статус получения заказов', default=True)
+
+    # filename
 
     class Meta:
         verbose_name = 'Магазин'
@@ -111,9 +141,9 @@ class Shop(m.Model):
         return self.name
 
 
-class Category(m.Model):
-    name = m.CharField(max_length=80, verbose_name='Название')
-    shops = m.ManyToManyField(Shop, verbose_name='Магазины', related_name='categories', blank=True)
+class Category(models.Model):
+    name = models.CharField(max_length=40, verbose_name='Название')
+    shops = models.ManyToManyField(Shop, verbose_name='Магазины', related_name='categories', blank=True)
 
     class Meta:
         verbose_name = 'Категория'
@@ -124,10 +154,10 @@ class Category(m.Model):
         return self.name
 
 
-class Product(m.Model):
-    name = m.CharField(max_length=80, verbose_name='Название')
-    category = m.ForeignKey(Category, verbose_name='Категория', related_name='products', blank=True,
-                            on_delete=m.CASCADE)
+class Product(models.Model):
+    name = models.CharField(max_length=80, verbose_name='Название')
+    category = models.ForeignKey(Category, verbose_name='Категория', related_name='products', blank=True,
+                                 on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Продукт'
@@ -138,26 +168,27 @@ class Product(m.Model):
         return self.name
 
 
-class ProductInfo(m.Model):
-    model = m.CharField(max_length=80, verbose_name='Модель', blank=True)
-    quantity = m.PositiveIntegerField(verbose_name='Количество')
-    price = m.PositiveIntegerField(verbose_name='Цена')
-    price_rrc = m.PositiveIntegerField(verbose_name='Рекомендуемая розничная цена')
-    external_id = m.PositiveIntegerField(verbose_name='Внешний ИД')
-    product = m.ForeignKey(Product, verbose_name='Продукт', related_name='product_info', blank=True,
-                           on_delete=m.CASCADE)
-    shop = m.ForeignKey(Shop, verbose_name='Магазин', related_name='product_info', blank=True, on_delete=m.CASCADE)
+class ProductInfo(models.Model):
+    model = models.CharField(max_length=80, verbose_name='Модель', blank=True)
+    external_id = models.PositiveIntegerField(verbose_name='Внешний ИД')
+    product = models.ForeignKey(Product, verbose_name='Продукт', related_name='product_info', blank=True,
+                                on_delete=models.CASCADE)
+    shop = models.ForeignKey(Shop, verbose_name='Магазин', related_name='product_info', blank=True,
+                             on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(verbose_name='Количество')
+    price = models.PositiveIntegerField(verbose_name='Цена')
+    price_rrc = models.PositiveIntegerField(verbose_name='Рекомендуемая розничная цена')
 
     class Meta:
         verbose_name = 'Информация о продукте'
         verbose_name_plural = "Информационный список о продуктах"
         constraints = [
-            m.UniqueConstraint(fields=['product', 'shop', 'external_id'], name='unique_product_info'),
+            models.UniqueConstraint(fields=['product', 'shop', 'external_id'], name='unique_product_info'),
         ]
 
 
-class Parameter(m.Model):
-    name = m.CharField(max_length=80, verbose_name='Название')
+class Parameter(models.Model):
+    name = models.CharField(max_length=40, verbose_name='Название')
 
     class Meta:
         verbose_name = 'Имя параметра'
@@ -168,44 +199,32 @@ class Parameter(m.Model):
         return self.name
 
 
-class ProductParameter(m.Model):
-    product_info = m.ForeignKey(ProductInfo, verbose_name='Информация о продукте', related_name='product_parameters',
-                                blank=True, on_delete=m.CASCADE)
-    parameter = m.ForeignKey(Parameter, verbose_name='Параметр', related_name='product_parameters', blank=True,
-                             on_delete=m.CASCADE)
-    value = m.CharField(verbose_name='Значение', max_length=100)
+class ProductParameter(models.Model):
+    product_info = models.ForeignKey(ProductInfo, verbose_name='Информация о продукте',
+                                     related_name='product_parameters', blank=True,
+                                     on_delete=models.CASCADE)
+    parameter = models.ForeignKey(Parameter, verbose_name='Параметр', related_name='product_parameters', blank=True,
+                                  on_delete=models.CASCADE)
+    value = models.CharField(verbose_name='Значение', max_length=100)
 
     class Meta:
         verbose_name = 'Параметр'
         verbose_name_plural = "Список параметров"
         constraints = [
-            m.UniqueConstraint(fields=['product_info', 'parameter'], name='unique_product_parameter'),
+            models.UniqueConstraint(fields=['product_info', 'parameter'], name='unique_product_parameter'),
         ]
 
 
-class Contact(m.Model):
-    user = m.ForeignKey(User, verbose_name='Пользователь', related_name='contacts', blank=True, on_delete=m.CASCADE)
-    city = m.CharField(max_length=50, verbose_name='Город')
-    street = m.CharField(max_length=100, verbose_name='Улица')
-    house = m.CharField(max_length=15, verbose_name='Дом', blank=True)
-    structure = m.CharField(max_length=15, verbose_name='Корпус', blank=True)
-    building = m.CharField(max_length=15, verbose_name='Строение', blank=True)
-    apartment = m.CharField(max_length=15, verbose_name='Квартира', blank=True)
-    phone = m.CharField(max_length=20, verbose_name='Телефон')
-
-    class Meta:
-        verbose_name = 'Контакты пользователя'
-        verbose_name_plural = "Список контактов пользователя"
-
-    def __str__(self):
-        return f'{self.city} {self.street} {self.house}'
-
-
-class Order(m.Model):
-    user = m.ForeignKey(User, verbose_name='Пользователь', related_name='orders', blank=True, on_delete=m.CASCADE)
-    dt = m.DateTimeField(auto_now_add=True)
-    state = m.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15)
-    contact = m.ForeignKey(Contact, verbose_name='Контакт', blank=True, null=True, on_delete=m.CASCADE)
+class Order(models.Model):
+    user = models.ForeignKey(User, verbose_name='Пользователь',
+                             related_name='orders', blank=True,
+                             on_delete=models.CASCADE)
+    dt = models.DateTimeField(auto_now_add=True)
+    state = models.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15)
+    contact = models.ForeignKey(Contact, verbose_name='Контакт',
+                                blank=True, null=True,
+                                on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, verbose_name='Товар', on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Заказ'
@@ -216,24 +235,24 @@ class Order(m.Model):
         return str(self.dt)
 
 
-class OrderItem(m.Model):
-    order = m.ForeignKey(Order, verbose_name='Заказ', related_name='ordered_items', blank=True, on_delete=m.CASCADE)
-    product_info = m.ForeignKey(ProductInfo, verbose_name='Информация о продукте', related_name='ordered_items',
-                                blank=True, on_delete=m.CASCADE)
-    quantity = m.PositiveIntegerField(verbose_name='Количество')
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, verbose_name='Заказ', related_name='ordered_items', blank=True,
+                              on_delete=models.CASCADE)
+
+    product_info = models.ForeignKey(ProductInfo, verbose_name='Информация о продукте', related_name='ordered_items',
+                                     blank=True,
+                                     on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(verbose_name='Количество')
 
     class Meta:
         verbose_name = 'Заказанная позиция'
         verbose_name_plural = "Список заказанных позиций"
         constraints = [
-            m.UniqueConstraint(fields=['order_id', 'product_info'], name='unique_order_item'),
+            models.UniqueConstraint(fields=['order_id', 'product_info'], name='unique_order_item'),
         ]
 
-    def __str__(self):
-        return f'{self.order}, позиция {self.product_info}'
 
-
-class ConfirmEmailToken(m.Model):
+class ConfirmEmailToken(models.Model):
     class Meta:
         verbose_name = 'Токен подтверждения Email'
         verbose_name_plural = 'Токены подтверждения Email'
@@ -243,20 +262,20 @@ class ConfirmEmailToken(m.Model):
         """ generates a pseudo random code using os.urandom and binascii.hexlify """
         return get_token_generator().generate_token()
 
-    user = m.ForeignKey(
+    user = models.ForeignKey(
         User,
         related_name='confirm_email_tokens',
-        on_delete=m.CASCADE,
+        on_delete=models.CASCADE,
         verbose_name=_("The User which is associated to this password reset token")
     )
 
-    created_at = m.DateTimeField(
+    created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("When was this token generated")
     )
 
     # Key field, though it is not the primary key of the model
-    key = m.CharField(
+    key = models.CharField(
         _("Key"),
         max_length=64,
         db_index=True,

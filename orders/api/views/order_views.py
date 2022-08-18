@@ -1,18 +1,18 @@
 from django.db import IntegrityError
 from django.db.models import Sum, F, Q
 from django.http import JsonResponse
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import RetrieveUpdateDestroyAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from orders.api.models import Order, OrderItem
-from orders.api.serializers import OrderSerializer, OrderItemSerializer
+from api.models import Order, OrderItem
+from api.serializers import OrderSerializer
 
 from ujson import loads as load_json
-from orders.api.tasks import new_order_email
+from api.tasks import new_order_email
 
 
-class BasketView(GenericAPIView):
+class BasketView(RetrieveUpdateDestroyAPIView):
     """
     Класс для работы с корзиной пользователя
     """
@@ -23,14 +23,12 @@ class BasketView(GenericAPIView):
         """
         Метод для получения списка товаров в корзине
         """
-
         basket = Order.objects.filter(
             user_id=request.user.id, status='basket').prefetch_related(
             'ordered_items__product_info__product__category',
             'ordered_items__product_info__product_parameters__parameter').annotate(
             total_sum=Sum(F('ordered_items__quantity') * F('ordered_items__product_info__price'))).distinct()
-
-        serializer = OrderSerializer(basket, many=True)
+        serializer = self.get_serializer(basket, many=True)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs):
@@ -48,19 +46,16 @@ class BasketView(GenericAPIView):
                 objects_created = 0
                 for order_item in items_dict:
                     order_item.update({'order': basket.id})
-                    serializer = OrderItemSerializer(data=order_item)
+                    serializer = self.get_serializer(data=order_item)
                     if serializer.is_valid():
                         try:
                             serializer.save()
                         except IntegrityError as error:
-                            return JsonResponse(
-                                {'Status': False, 'Errors': f'Товар уже добавлен в корзину'})  # str(error)})
+                            return JsonResponse({'Status': False, 'Errors': f'Товар уже добавлен в корзину'})
                         else:
                             objects_created += 1
-
                     else:
                         JsonResponse({'Status': False, 'Errors': serializer.errors})
-
                 return JsonResponse({'Status': True, 'Message': f'Выбранные товары ({objects_created}) добавлены в '
                                                                 f'корзину'})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -69,7 +64,6 @@ class BasketView(GenericAPIView):
         """
         Метод для удаления товаров из корзины
         """
-
         items_sting = request.data.get('items')
         if items_sting:
             items_list = items_sting.split(',')
@@ -103,15 +97,13 @@ class BasketView(GenericAPIView):
                     if type(order_item['id']) == int and type(order_item['quantity']) == int:
                         objects_updated += OrderItem.objects.filter(order_id=basket.id, id=order_item['id']).update(
                             quantity=order_item['quantity'])
-
                 return JsonResponse({'Status': True, 'Обновлено объектов': objects_updated})
-
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
 
-class OrderView(GenericAPIView):
+class OrderView(RetrieveUpdateAPIView):
     """
-    Класс для получения и размешения заказов пользователями
+    Класс для получения и размещения заказов пользователями
     """
     permission_classes = (IsAuthenticated, )
     serializer_class = OrderSerializer
@@ -126,7 +118,7 @@ class OrderView(GenericAPIView):
             'ordered_items__product_info__product_parameters__parameter').select_related('contact').annotate(
             total_sum=Sum(F('ordered_items__quantity') * F('ordered_items__product_info__price'))).distinct()
 
-        serializer = OrderSerializer(order, many=True)
+        serializer = self.get_serializer(order, many=True)
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs):
@@ -141,12 +133,9 @@ class OrderView(GenericAPIView):
                         contact_id=request.data['contact'],
                         status='new')
                 except IntegrityError as error:
-                    print(error)
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
                         new_order_email.delay(recipient_list=request.user.email,)
                         return JsonResponse({'Status': True})
-
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
-

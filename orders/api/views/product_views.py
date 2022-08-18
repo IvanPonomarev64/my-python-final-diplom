@@ -1,10 +1,10 @@
 from django.db.models import Q
-from rest_framework.generics import ListAPIView, GenericAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
-from orders.api.models import Category, Shop, ProductInfo
-from orders.api.permissions import IsAdminOrReadOnly
-from orders.api.serializers import CategorySerializer, ShopSerializer, ProductInfoSerializer
+from api.models import Category, Shop, ProductInfo
+from api.permissions import IsAdminOrReadOnly
+from api.serializers import CategorySerializer, ShopSerializer, ProductInfoSerializer
 
 
 class CategoryView(ListAPIView):
@@ -25,10 +25,13 @@ class ShopView(ListAPIView):
     serializer_class = ShopSerializer
 
 
-class ProductInfoView(GenericAPIView):
+class ProductInfoView(RetrieveAPIView):
     """
     Класс для поиска товаров
     """
+    queryset = ProductInfo.objects.all()
+    serializer_class = ProductInfoSerializer
+
     def get(self, request, *args, **kwargs):
 
         query = Q(shop__state=True)
@@ -47,6 +50,6 @@ class ProductInfoView(GenericAPIView):
             'shop', 'product__category').prefetch_related(
             'product_parameters__parameter').distinct()
 
-        serializer = ProductInfoSerializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True)
 
         return Response(serializer.data)
